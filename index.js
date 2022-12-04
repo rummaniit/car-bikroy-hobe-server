@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId, ObjectID } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
 const app = express()
@@ -15,6 +15,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run() {
     try {
         const carCollection = client.db('car-bikroy').collection('allcars');
+        const userCollection = client.db('car-bikroy').collection('allusers')
         app.get('/allcars', async (req, res) => {
             const query = {}
             const result = await carCollection.find(query).toArray()
@@ -40,6 +41,14 @@ async function run() {
             }
         });
 
+        app.get('/allproducts/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await carCollection.find(query).toArray()
+            res.send(result)
+            console.log(result);
+        })
+
         app.put('/available', async (req, res) => {
             const pname = req.query.name
             const updatedResult = await carCollection.updateOne({ 'category_products.p_name': pname, 'category_products.p_name': pname }, { $set: { "category_products.$.available": req.body.verify } })
@@ -62,6 +71,44 @@ async function run() {
                 // / Multi
             );
             res.send(result)
+        })
+        app.post('/allusers', async (req, res) => {
+            let userInfo = req.body
+            console.log(userInfo);
+            const result = await userCollection.insertOne(userInfo)
+            res.send(result)
+            console.log(result);
+        });
+
+        app.get('/allusers', async (req, res) => {
+
+            const result = await userCollection.find({}).toArray()
+            res.send(result)
+            console.log(result);
+        });
+
+        app.delete('/deleteseller/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            var deleted = await userCollection.deleteOne(query)
+            console.log(deleted);
+            res.send(deleted)
+        })
+        app.delete('/deletebuyer/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            var deleted = await userCollection.deleteOne(query)
+            console.log(deleted);
+            res.send(deleted)
+        })
+
+        app.put('/verifyseller/:id', async (req, res) => {
+            const id = req.params.id
+            console.log(id)
+            userCollection.updateOne(
+                { _id: ObjectId(id) },
+                { $set: { "verify": true } }
+            );
         })
 
         app.get('/sellerproducts', async (req, res) => {
