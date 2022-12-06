@@ -4,6 +4,7 @@ const cors = require('cors');
 const app = express()
 app.use(cors())
 app.use(express.json())
+var jwt = require('jsonwebtoken');
 require('dotenv').config()
 const port = process.env.PORT || 5000
 
@@ -12,10 +13,29 @@ const port = process.env.PORT || 5000
 const uri = `mongodb+srv://${process.env.DB_USER_NAME}:${process.env.DB_USER_PASSWORD}@cluster0.xteb5ll.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
+const verifyToken = (req, res, next) => {
+    // console.log('bearer', req.headers.authorization)
+    const authHeader = req.headers.authorization
+    if (!authHeader) {
+        res.status(401).send('Unauthorizes Access')
+    }
+    const token = authHeader.split(' ')[1]
+    console.log(token);
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            res.status(401).send('Fordiben Access')
+        }
+        req.decoded = decoded
+        next()
+    })
+
+}
+
 async function run() {
     try {
         const carCollection = client.db('car-bikroy').collection('allcars');
         const userCollection = client.db('car-bikroy').collection('allusers')
+        const bookingCollection = client.db('car-bikroy').collection('allbookings')
         app.get('/allcars', async (req, res) => {
             const query = {}
             const result = await carCollection.find(query).toArray()
@@ -40,6 +60,23 @@ async function run() {
                 res.send(query)
             }
         });
+        app.get('/jwt', async (req, res) => {
+            const email = req.query.email
+            const query = {
+                email: email
+            }
+            const result = await userCollection.findOne(query)
+            if (result) {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '5d' })
+                return res.send({
+                    accessToken: token
+                })
+            }
+            console.log(result);
+            res.status(403).send({
+                accessToken: 'forbiden'
+            })
+        })
 
         app.get('/allproducts/:id', async (req, res) => {
             const id = req.params.id
@@ -79,13 +116,39 @@ async function run() {
             res.send(result)
             console.log(result);
         });
-
+        app.post('/allbooking', async (req, res) => {
+            const allbookings = req.body
+            const result = await bookingCollection.insertOne(allbookings)
+            res.send(result)
+        })
+        app.get('/allbooking/user', verifyToken, async (req, res) => {
+            const email = req.query.email
+            const decodedEmail = req.decoded.email
+            if (!email == decodedEmail) {
+                res.status(401).send({
+                    message: 'Forbiden Access'
+                })
+            }
+            const query = {
+                'currentUser': email
+            }
+            const result = await bookingCollection.find(query).toArray()
+            console.log(result);
+            res.send(result)
+        })
         app.get('/allusers', async (req, res) => {
-
             const result = await userCollection.find({}).toArray()
             res.send(result)
             console.log(result);
         });
+        app.get('/allusers/byemail', async (req, res) => {
+            const email = req.query.email
+            const query = {
+                email: email
+            }
+            const result = await userCollection.findOne(query)
+            res.send(result)
+        })
 
         app.delete('/deleteseller/:id', async (req, res) => {
             const id = req.params.id
