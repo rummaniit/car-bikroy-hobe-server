@@ -6,6 +6,7 @@ app.use(cors())
 app.use(express.json())
 var jwt = require('jsonwebtoken');
 require('dotenv').config()
+const stripe = require("stripe")('sk_test_51M9vT1KC3hoVsD4SUfoN84EZDwW4GGN4L4hLsCfErCa113BSsBce2QoVzIB4AtMKgqG8dosx4UMXHT17KT18IF4300zxauunsj');
 const port = process.env.PORT || 5000
 
 
@@ -121,6 +122,33 @@ async function run() {
             const result = await bookingCollection.insertOne(allbookings)
             res.send(result)
         })
+        app.get('/allbooking/users/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await bookingCollection.findOne(query)
+            res.send(result)
+        })
+
+        app.post('/create-payment-intent', async (req, res) => {
+            const booking = req.body;
+            // console.log(booking.items.productPrice);
+            const price = parseInt(booking.items.carprice)
+            console.log(price);
+            const amount = price * 100;
+            console.log('amount', amount);
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
+
         app.get('/allbooking/user', verifyToken, async (req, res) => {
             const email = req.query.email
             const decodedEmail = req.decoded.email
